@@ -61,46 +61,116 @@ func play(input ArenaUpdate) (response string) {
 }
 
 func move(input ArenaUpdate) string {
-	myself := input.Arena.State[input.Links.Self.Href]
-	if myself.X == 0 && myself.Direction == "W" {
-		if myself.Y == 0 {
-			return "L"
-		}
-		if myself.Y ==  input.Arena.Dimensions[1]-1{
-			return "R"
-		}
-		commands := []string{"L", "R"}
-		rand := rand2.Intn(2)
-		return commands[rand]
-	}
-	if myself.X == input.Arena.Dimensions[0]-1 && myself.Direction == "E" {
-		commands := []string{"L", "R"}
-		rand := rand2.Intn(2)
-		return commands[rand]
-	}
-	if myself.Y == 0 && myself.Direction == "N" {
-		commands := []string{"L", "R"}
-		rand := rand2.Intn(2)
-		return commands[rand]
-	}
-	if myself.Y == input.Arena.Dimensions[1]-1 && myself.Direction == "S" {
-		commands := []string{"L", "R"}
-		rand := rand2.Intn(2)
-		return commands[rand]
-	}
 
-	commands := []string{"F", "L", "R"}
-	rand := rand2.Intn(3)
-	return commands[rand]
+	myself := input.Arena.State[input.Links.Self.Href]
+	return chooseMove(
+		myself.X, myself.Y,
+		input.Arena.Dimensions[0],
+		input.Arena.Dimensions[1],
+		myself.Direction,
+	)
 }
 
-// func chooseMove(x int, y int, max_x int, max_y, int, direction string) string {
-// 	if (x==0) {
-// 		if (y==0) {
+func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 
-// 		}
-// 	}
-// }
+	if x == 0 || x == (max_x-1) {
+		if y == 0 {
+			if x == 0 {
+				if direction == "N" {
+					return "R"
+				} else if direction == "W" {
+					return "L"
+				} else if direction == "S" {
+					return []string{"L", "F"}[rand2.Intn(2)]
+				} else {
+					return []string{"R", "F"}[rand2.Intn(2)]
+				}
+			} else {
+				if direction == "N" {
+					return "L"
+				} else if direction == "E" {
+					return "R"
+				} else if direction == "S" {
+					return []string{"R", "F"}[rand2.Intn(2)]
+				} else {
+					return []string{"L", "F"}[rand2.Intn(2)]
+				}
+			}
+		}
+		if y == max_y-1 {
+			if x == 0 {
+				if direction == "S" {
+					return "L"
+				} else if direction == "W" {
+					return "R"
+				} else if direction == "N" {
+					return []string{"R", "F"}[rand2.Intn(2)]
+				} else {
+					return []string{"L", "F"}[rand2.Intn(2)]
+				}
+			} else {
+				if direction == "S" {
+					return "R"
+				} else if direction == "E" {
+					return "L"
+				} else if direction == "N" {
+					return []string{"L", "F"}[rand2.Intn(2)]
+				} else {
+					return []string{"R", "F"}[rand2.Intn(2)]
+				}
+			}
+		}
+		if y == (max_y - 1) {
+			if direction == "N" || direction == "W" {
+				return "L"
+			} else {
+				return "R"
+			}
+		}
+		if x == 0 {
+			if direction == "N" {
+				return []string{"R", "F"}[rand2.Intn(2)]
+			} else if direction == "S" {
+				return []string{"L", "F"}[rand2.Intn(2)]
+			}
+			if direction == "W" {
+				return []string{"L", "R"}[rand2.Intn(2)]
+			}
+		}
+		if x == max_x-1 {
+			if direction == "N" {
+				return []string{"L", "F"}[rand2.Intn(2)]
+			} else if direction == "S" {
+				return []string{"R", "F"}[rand2.Intn(2)]
+			}
+			if direction == "E" {
+				return []string{"L", "R"}[rand2.Intn(2)]
+			}
+		}
+	}
+
+	if y == 0 {
+		if direction == "E" {
+			return []string{"L", "F"}[rand2.Intn(2)]
+		} else if direction == "W" {
+			return []string{"R", "F"}[rand2.Intn(2)]
+		}
+		if direction == "N" {
+			return []string{"L", "R"}[rand2.Intn(2)]
+		}
+	}
+	if y == max_y-1 {
+		if direction == "E" {
+			return []string{"R", "F"}[rand2.Intn(2)]
+		} else if direction == "W" {
+			return []string{"L", "F"}[rand2.Intn(2)]
+		}
+		if direction == "S" {
+			return []string{"L", "R"}[rand2.Intn(2)]
+		}
+	}
+	return []string{"L", "R", "F"}[rand2.Intn(3)]
+}
 
 func shouldRight(me string, input ArenaUpdate) bool {
 	myself := input.Arena.State[me]
@@ -151,6 +221,11 @@ func shouldGo(me string, input ArenaUpdate) bool {
 }
 
 func shouldThrow(me string, input ArenaUpdate) bool {
+	if input.Arena.State[me].WasHit {
+		if 50 < rand2.Intn(100) {
+			return false
+		}
+	}
 	for player, state := range input.Arena.State {
 		if player != me {
 			if inRange(input.Arena.State[me], state, input.Arena.State[me].Direction, 3) {
