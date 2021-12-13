@@ -43,11 +43,14 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 func play(input ArenaUpdate) (response string) {
 	log.Printf("IN: %#v", input)
+	escape := shouldEscape(input)
 
-	if shouldThrow(input.Links.Self.Href, input) {
+	if !escape && shouldThrow(input.Links.Self.Href, input) {
 		return "T"
 	}
-	if shouldGo(input.Links.Self.Href, input) {
+	occupied := isTileOccupied(input.Links.Self.Href, input)
+	log.Printf("Es: %v.  Occ: %v", escape, occupied)
+	if !occupied && (escape || shouldGo(input.Links.Self.Href, input)) {
 		return "F"
 	}
 	if shouldRight(input.Links.Self.Href, input) {
@@ -56,11 +59,25 @@ func play(input ArenaUpdate) (response string) {
 	if shouldLeft(input.Links.Self.Href, input) {
 		return "L"
 	}
-	log.Printf("RANDOM: ")
-	return move(input)
+	return move(input, occupied)
 }
 
-func move(input ArenaUpdate) string {
+func shouldEscape(input ArenaUpdate) bool {
+	myself := input.Arena.State[input.Links.Self.Href]
+	c := 0
+	if myself.WasHit {
+		for player, state := range input.Arena.State {
+			if player != input.Links.Self.Href {
+				if inRange(state, myself, state.Direction, 3) {
+					c++
+				}
+			}
+		}
+	}
+	return c > 0
+}
+
+func move(input ArenaUpdate, occupied bool) string {
 
 	myself := input.Arena.State[input.Links.Self.Href]
 	return chooseMove(
@@ -68,10 +85,11 @@ func move(input ArenaUpdate) string {
 		input.Arena.Dimensions[0],
 		input.Arena.Dimensions[1],
 		myself.Direction,
+		occupied,
 	)
 }
 
-func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
+func chooseMove(x int, y int, max_x int, max_y int, direction string, occupied bool) string {
 
 	if x == 0 || x == (max_x-1) {
 		if y == 0 {
@@ -81,9 +99,9 @@ func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 				} else if direction == "W" {
 					return "L"
 				} else if direction == "S" {
-					return []string{"L", "F"}[rand2.Intn(2)]
+					return choose([]string{"L", "F"}, occupied)
 				} else {
-					return []string{"R", "F"}[rand2.Intn(2)]
+					return choose([]string{"R", "F"}, occupied)
 				}
 			} else {
 				if direction == "N" {
@@ -91,9 +109,9 @@ func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 				} else if direction == "E" {
 					return "R"
 				} else if direction == "S" {
-					return []string{"R", "F"}[rand2.Intn(2)]
+					return choose([]string{"R", "F"}, occupied)
 				} else {
-					return []string{"L", "F"}[rand2.Intn(2)]
+					return choose([]string{"L", "F"}, occupied)
 				}
 			}
 		}
@@ -104,9 +122,9 @@ func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 				} else if direction == "W" {
 					return "R"
 				} else if direction == "N" {
-					return []string{"R", "F"}[rand2.Intn(2)]
+					return choose([]string{"R", "F"}, occupied)
 				} else {
-					return []string{"L", "F"}[rand2.Intn(2)]
+					return choose([]string{"L", "F"}, occupied)
 				}
 			} else {
 				if direction == "S" {
@@ -114,9 +132,9 @@ func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 				} else if direction == "E" {
 					return "L"
 				} else if direction == "N" {
-					return []string{"L", "F"}[rand2.Intn(2)]
+					return choose([]string{"L", "F"}, occupied)
 				} else {
-					return []string{"R", "F"}[rand2.Intn(2)]
+					return choose([]string{"R", "F"}, occupied)
 				}
 			}
 		}
@@ -131,32 +149,32 @@ func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 			if direction == "N" {
 				return []string{"R", "F"}[rand2.Intn(2)]
 			} else if direction == "S" {
-				return []string{"L", "F"}[rand2.Intn(2)]
+				return choose([]string{"L", "F"}, occupied)
 			}
 			if direction == "W" {
-				return []string{"L", "R"}[rand2.Intn(2)]
+				return choose([]string{"L", "R"}, false)
 			}
 		}
 		if x == max_x-1 {
 			if direction == "N" {
-				return []string{"L", "F"}[rand2.Intn(2)]
+				return choose([]string{"L", "F"}, occupied)
 			} else if direction == "S" {
-				return []string{"R", "F"}[rand2.Intn(2)]
+				return choose([]string{"R", "F"}, occupied)
 			}
 			if direction == "E" {
-				return []string{"L", "R"}[rand2.Intn(2)]
+				return choose([]string{"L", "R"}, false)
 			}
 		}
 	}
 
 	if y == 0 {
 		if direction == "E" {
-			return []string{"L", "F"}[rand2.Intn(2)]
+			return choose([]string{"L", "F"}, occupied)
 		} else if direction == "W" {
-			return []string{"R", "F"}[rand2.Intn(2)]
+			return choose([]string{"R", "F"}, occupied)
 		}
 		if direction == "N" {
-			return []string{"L", "R"}[rand2.Intn(2)]
+			return choose([]string{"L", "R"}, false)
 		}
 	}
 	if y == max_y-1 {
@@ -166,10 +184,18 @@ func chooseMove(x int, y int, max_x int, max_y int, direction string) string {
 			return []string{"L", "F"}[rand2.Intn(2)]
 		}
 		if direction == "S" {
-			return []string{"L", "R"}[rand2.Intn(2)]
+			return choose([]string{"L", "R"}, false)
 		}
 	}
-	return []string{"L", "R", "F"}[rand2.Intn(3)]
+	return choose([]string{"L", "R", "F"}, occupied)
+}
+
+func choose(options []string, occupied bool) string {
+	l := len(options)
+	if occupied {
+		l -= 1
+	}
+	return options[rand2.Intn(l)]
 }
 
 func shouldRight(me string, input ArenaUpdate) bool {
@@ -205,6 +231,7 @@ func shouldLeft(me string, input ArenaUpdate) bool {
 			}
 		}
 	}
+	log.Printf("should lefg %s", direction[myself.Direction])
 	return false
 }
 
@@ -215,11 +242,37 @@ func shouldGo(me string, input ArenaUpdate) bool {
 				return true
 			}
 		}
-		log.Printf("R: %#v", player)
 	}
 	return false
 }
 
+func isTileOccupied(me string, input ArenaUpdate) bool {
+	myself := input.Arena.State[me]
+	newX := myself.X
+	newY := myself.Y
+	switch myself.Direction {
+	case "S":
+		newY += 1
+	case "N":
+		newY -= 1
+	case "E":
+		newX += 1
+	case "W":
+		newX -= 1
+	}	
+	if newX >= input.Arena.Dimensions[0] || newX < 0 || newY >= input.Arena.Dimensions[1] || newY < 0 {
+		return true
+	}
+	for player, state := range input.Arena.State {
+		if player != me {
+			if state.X == newX && state.Y == newY {
+				return true
+			}
+		}
+	}
+
+	return false
+}
 func shouldThrow(me string, input ArenaUpdate) bool {
 	if input.Arena.State[me].WasHit {
 		if 50 < rand2.Intn(100) {
@@ -239,18 +292,18 @@ func shouldThrow(me string, input ArenaUpdate) bool {
 
 func inRange(me PlayerState, other PlayerState, direction string, dis int) bool {
 	r := -1
-	if me.Direction == "N" && me.X == other.X {
+	if direction == "N" && me.X == other.X {
 		r = me.Y - other.Y
 	}
-	if me.Direction == "S" && me.X == other.X {
+	if direction == "S" && me.X == other.X {
 		r = other.Y - me.Y
 	}
-	if me.Direction == "E" && me.Y == other.Y {
+	if direction == "E" && me.Y == other.Y {
 		r = other.X - me.X
 	}
-	if me.Direction == "W" && me.Y == other.Y {
+	if direction == "W" && me.Y == other.Y {
 		r = me.X - other.X
 	}
-	log.Printf("R: %s %#v", me.Direction, r)
+	log.Printf("R: %s %#v", direction, r)
 	return r > 0 && r <= dis
 }
